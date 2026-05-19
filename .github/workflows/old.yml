@@ -35,11 +35,11 @@ jobs:
           sudo curl -L https://storage.googleapis.com/git-repo-downloads/repo -o /usr/local/bin/repo
           sudo chmod a+x /usr/local/bin/repo
 
-      - name: Set up Android Kernel source (with Tsinghua mirror)
+      - name: Set up Android Kernel source
         run: |
-          export REPO_URL="https://mirrors.tuna.tsinghua.edu.cn/git/AOSP/kernel/manifest"
           mkdir -p android-kernel && cd android-kernel
-          repo init -u https://android.googlesource.com/kernel/manifest -b common-android${{ github.event.inputs.android_version }}-${{ github.event.inputs.kernel_version }}
+          # 使用清华镜像，解决国内访问不了 Google 的问题
+          repo init -u https://mirrors.tuna.tsinghua.edu.cn/git/AOSP/kernel/manifest -b common-android${{ github.event.inputs.android_version }}-${{ github.event.inputs.kernel_version }}
           repo sync -j$(nproc) -c --no-tags --optimized-fetch --force-sync
 
       - name: Copy kerneldriver
