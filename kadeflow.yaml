@@ -9,15 +9,15 @@ kade:
       flavor: "gki"                # gki | non_gki
 
     gki:
-      android_version: 14
-      kernel_version: "6.1"
+      android_version: 13
+      kernel_version: "5.10"
       target_arch: "aarch64"
 
       driver:
-        project_name: "file_copy"
+        project_name: "TearGame"
         in_tree: false
         external_src_dir: "${GITHUB_WORKSPACE}/code"
-        module_name: "file_copy.ko"
+        module_name: "TearGame.ko"
         overwrite: true
 
       # optional: Bazel args for >13
