@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       android_version:
-        description: 'Android Version (Kernel) (e.g., 14)'
+        description: 'Android Version (Kernel) (e.g., 13)'
         required: true
       kernel_version:
-        description: 'Kernel Version (e.g., 6.1)'
+        description: 'Kernel Version (e.g., 5.1)'
         required: true
       driver_name:
-        description: 'Driver Module Name (e.g., mydriver.ko)'
+        description: 'Driver Module Name (e.g., TearGame.ko)'
         required: true
       target_arch:
         description: 'Target Architecture (aarch64, x86_64, etc.)'
