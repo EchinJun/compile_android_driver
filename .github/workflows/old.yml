@@ -1,42 +1,43 @@
-name: Android Kernel Driver Builder (OLD)
+name: Android Kernel Driver Builder
 
 on:
   workflow_dispatch:
     inputs:
       android_version:
-        description: 'Android Version (Kernel) (e.g., 14)'
+        description: 'Android Version (e.g., 13)'
         required: true
       kernel_version:
-        description: 'Kernel Version (e.g., 6.1)'
+        description: 'Kernel Version (e.g., 5.10)'
         required: true
       driver_name:
-        description: 'Driver Module Name (e.g., mydriver.ko)'
+        description: 'Driver Module Name (e.g., TearGame.ko)'
         required: true
       target_arch:
-        description: 'Target Architecture (aarch64, x86_64, etc.)'
+        description: 'Target Architecture (aarch64)'
         required: true
         default: 'aarch64'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4.2.2
-        
+        uses: actions/checkout@v4
+
       - name: Prepare kerneldriver directory
         run: |
           mkdir kerneldriver
-          mv ./code/*.h ./code/*.c ./code/Makefile kerneldriver/
-          
+          cp -r ./code/* kerneldriver/
+
       - name: Install repo tool
         run: |
           sudo curl -L https://storage.googleapis.com/git-repo-downloads/repo -o /usr/local/bin/repo
           sudo chmod a+x /usr/local/bin/repo
 
-      - name: Set up Android Kernel source
+      - name: Set up Android Kernel source (with Tsinghua mirror)
         run: |
+          export REPO_URL="https://mirrors.tuna.tsinghua.edu.cn/git/AOSP/kernel/manifest"
           mkdir -p android-kernel && cd android-kernel
           repo init -u https://android.googlesource.com/kernel/manifest -b common-android${{ github.event.inputs.android_version }}-${{ github.event.inputs.kernel_version }}
           repo sync -j$(nproc) -c --no-tags --optimized-fetch --force-sync
@@ -51,12 +52,11 @@ jobs:
           cd android-kernel
           echo "obj-y += kerneldriver/" >> common/drivers/Makefile
 
-      - name: Add module to GKI modules list
+      - name: Add module to GKI modules list (Android > 13)
         if: ${{ github.event.inputs.android_version > 13 }}
         run: |
           cd android-kernel
           MODULE_NAME="drivers/kerneldriver/${{ github.event.inputs.driver_name }}"
-          
           awk -i inplace -v module="$MODULE_NAME" '
             BEGIN { added=0 }
             /_COMMON_GKI_MODULES_LIST = \[/ { in_list=1 }
@@ -75,12 +75,13 @@ jobs:
             }
             { print }
           ' common/modules.bzl
-          
-      - name: Prepare module list for legacy builds
+
+      - name: Prepare module list for legacy builds (Android <= 13)
         if: ${{ github.event.inputs.android_version <= 13 }}
         run: |
           cd android-kernel
           echo "drivers/kerneldriver/${{ github.event.inputs.driver_name }}" >> common/android/gki_${{ github.event.inputs.target_arch }}_modules
+
       - name: Increase stack frame size limit
         run: |
           cd android-kernel
@@ -91,6 +92,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential flex bison libssl-dev libelf-dev bc python-is-python3
+
       - name: Fix missing kprobe symbols for Android 13
         if: ${{ github.event.inputs.android_version == 13 }}
         run: |
@@ -100,7 +102,15 @@ jobs:
             echo "$symbol" >> common/android/abi_gki_${{ github.event.inputs.target_arch }}
           done
           sed -i '/EXPORT_SYMBOL(unregister_kprobe);/a EXPORT_SYMBOL(register_kprobe);' common/kernel/kprobes.c
-          
+
+      - name: Enable BTI support in kernel config
+        run: |
+          cd android-kernel
+          grep -q "CONFIG_ARM64_BTI=y" common/arch/arm64/configs/gki_defconfig || \
+          echo "CONFIG_ARM64_BTI=y" >> common/arch/arm64/configs/gki_defconfig
+          grep -q "CONFIG_ARM64_PTR_AUTH=y" common/arch/arm64/configs/gki_defconfig || \
+          echo "CONFIG_ARM64_PTR_AUTH=y" >> common/arch/arm64/configs/gki_defconfig
+
       - name: Build kernel module
         run: |
           cd android-kernel
@@ -114,9 +124,9 @@ jobs:
           fi
           echo "OUTPUT_PATH=$OUTPUT_PATH" >> $GITHUB_ENV
         continue-on-error: true
-      
+
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v4
         with:
           name: kernel-driver-${{ github.event.inputs.target_arch }}
           path: |
